@@ -1,33 +1,34 @@
-FROM postgres:16
-LABEL maintainer="Alexander Kukushkin <akukushkin@microsoft.com>"
+FROM postgis/postgis:14-3.3
+LABEL maintainer="xujinshui <16443678@qq.com>"
 
-RUN export DEBIAN_FRONTEND=noninteractive \
-    && echo 'APT::Install-Recommends "0";\nAPT::Install-Suggests "0";' > /etc/apt/apt.conf.d/01norecommend \
-    && apt-get update -y \
-    && apt-get upgrade -y \
-    && apt-cache depends patroni | sed -n -e 's/.* Depends: \(python3-.\+\)$/\1/p' \
+RUN export DEBIAN_FRONTEND=noninteractive
+RUN echo 'APT::Install-Recommends "0";\nAPT::Install-Suggests "0";' > /etc/apt/apt.conf.d/01norecommend
+RUN apt-get update -y
+RUN apt-get upgrade -y
+RUN apt-cache depends patroni | sed -n -e 's/.* Depends: \(python3-.\+\)$/\1/p' \
             | grep -Ev '^python3-(sphinx|etcd|consul|kazoo|kubernetes)' \
-            | xargs apt-get install -y busybox vim-tiny curl jq less locales git python3-pip python3-wheel lsb-release \
+            | xargs apt-get install -y busybox vim-tiny curl jq less locales git python3-pip python3-wheel lsb-release
     ## Make sure we have a en_US.UTF-8 locale available
-    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 \
-    && if [ $(dpkg --print-architecture) = 'arm64' ]; then \
-        apt-get install -y postgresql-server-dev-16 \
+RUN localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+RUN if [ $(dpkg --print-architecture) = 'arm64' ]; then \
+        apt-get install -y postgresql-server-dev-14 \
                            gcc make autoconf \
                            libc6-dev flex libcurl4-gnutls-dev \
                            libicu-dev libkrb5-dev liblz4-dev \
                            libpam0g-dev libreadline-dev libselinux1-dev\
                            libssl-dev libxslt1-dev libzstd-dev uuid-dev \
-        && git clone -b "main" https://github.com/citusdata/citus.git \
+    git clone -b "main" https://github.com/citusdata/citus.git \
         && MAKEFLAGS="-j $(grep -c ^processor /proc/cpuinfo)" \
         && cd citus && ./configure && make install && cd ../ && rm -rf /citus; \
     else \
         echo "deb [signed-by=/etc/apt/trusted.gpg.d/citusdata_community.gpg] https://packagecloud.io/citusdata/community/debian/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/citusdata_community.list \
         && curl -sL https://packagecloud.io/citusdata/community/gpgkey | gpg --dearmor > /etc/apt/trusted.gpg.d/citusdata_community.gpg \
+        && curl https://install.citusdata.com/community/deb.sh | bash \
         && apt-get update -y \
-        && apt-get -y install postgresql-16-citus-12.1; \
-    fi \
-    && pip3 install --break-system-packages setuptools \
-    && pip3 install --break-system-packages 'git+https://github.com/zalando/patroni.git#egg=patroni[kubernetes]' \
+        && apt-get -y install postgresql-14-citus-12.1; \
+    fi 
+RUN pip3 install setuptools \
+    && pip3 install 'git+https://github.com/zalando/patroni.git#egg=patroni[kubernetes]' \
     && PGHOME=/home/postgres \
     && mkdir -p $PGHOME \
     && chown postgres $PGHOME \
@@ -38,7 +39,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && chmod 664 /etc/passwd \
     # Clean up
     && apt-get remove -y git python3-pip python3-wheel \
-               postgresql-server-dev-16 gcc make autoconf \
+               postgresql-server-dev-14 gcc make autoconf \
                libc6-dev flex libicu-dev libkrb5-dev liblz4-dev \
                libpam0g-dev libreadline-dev libselinux1-dev libssl-dev libxslt1-dev libzstd-dev uuid-dev \
     && apt-get autoremove -y \
